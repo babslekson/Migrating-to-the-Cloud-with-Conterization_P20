@@ -244,3 +244,98 @@ php artisan serve  --host=0.0.0.0
 ![todo](images/todo.png)
 Access the web on your browser
 ![todo-homepage](images/todo-hp.png)
+
+### Push the todo-app image to the repository
+```bash
+docker login
+
+docker build -t babslekson/php_todo:0.0.1 .
+
+docker push babslekson/php_todo:0.0.1
+```
+![todo-dockerhub](images/todo-dh.png)
+
+### Part 3
+- write a jenkinsfile that will simulate docker build and docker push to the repository.
+```bash
+pipeline {
+
+        agent any
+
+        environment {
+                DOCKERHUB_CREDENTIALS=credentials('Dockerhub')
+        }
+
+        stages {
+           stage("initial Cleanup") {
+                steps {
+                        dir("${WORKSPACE}") {
+                                deleteDir()
+                           }
+                     }
+                  }
+
+
+            stage("checkout git") {
+                        steps {
+                           git branch: 'main', credentialsId: 'Github-id' , url:'https://github.com/babslekson/todo_php.git'
+                           }
+                        }
+            stage ("Building Docker image") {
+                steps {
+                        script  {
+                                sh ' docker build -t babslekson/php_todo:${BRANCH_NAME}-${BUILD_NUMBER} .'
+
+                        }
+                 }
+
+             }
+
+        stage ("push image to Docker hub") {
+                        steps {
+                           script {
+                                    sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+                                    sh 'docker push babslekson/php_todo:${BRANCH_NAME}-${BUILD_NUMBER}'
+                                }
+                             }
+             }
+
+            stage ('Cleanup') {
+                        steps {
+                                cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenUnstable: true, deleteDirs: true)
+```
+Step 2
+
+1. Push code to github
+2. Create ec2 instance and install jenkins
+3. Install docker on jenkins server so that simulation can take place. 
+4. Install docker  and github plugins under `Manage Jenkins`
+5. Configure credentials in jenkins for both docker and github so jenkins can access them
+6. Create Job, select multibranch pipeline. make sure you add the git url of the todo-app
+![pipeline](images/pipeline.png)
+![output](images/output.png)
+![php-todo](images/todo-dh.png)
+
+Practide Task - Complete continous integration with a test stage
+```bash
+stage ('Test Endpoint') {
+	steps {
+		script {
+			while (true) {
+				def res = httpRequest 'http://localhost:5000'
+			}
+		}
+	}
+}
+
+stage ('Push Image To Docker Hub') {
+	when { expression { res.status == 200 } }
+	steps {
+		script {
+			sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+
+			sh 'docker push babslekson/php_todo:${BRANCH_NAME}-${BUILD_NUMBER}'
+		}
+	}
+}
+```
