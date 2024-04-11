@@ -182,5 +182,65 @@ docker run --network todo_app_network -h mysqlhost --name=mysql-server -e MYSQL_
 docker run --network todo_app_network -p 8085:8000 -it php_todo:0.0.1
 ```
 ![todo-mysql](images/todo-sql.png)
+2. Run mysl-client container and create `todo-db`
+![mysql-cl](images/sqlcl.png)
 
-### Step 3: Clone the PHP-Todo-app repo [here]()
+
+### Step 3: Set up the TODO-PHP app
+ 1. Clone the PHP-Todo-app repo [here](https://github.com/babslekson/todo_php.git)
+ 2. update the .env.sample so that the app will be able to connect to the Mysql database
+ ```bash
+ sudo vim .env.sample 
+
+ DB_HOST=mysqlserverhost
+DB_DATABASE=tododb
+DB_USERNAME=olalekan
+DB_PASSWORD=olalekan12345
+```
+3. Write a Dockerfile for the todo-php app
+```bash
+FROM php:7.4.30-cli
+
+# Set the working directory in the container
+
+WORKDIR /var/www/html
+
+# Installl dependencies )
+
+RUN apt update \
+        && apt install -y libpng-dev zlib1g-dev libxml2-dev libzip-dev libonig-dev zip curl unzip \
+        && docker-php-ext-configure gd \
+        && docker-php-ext-install pdo pdo_mysql sockets mysqli zip -j$(nproc) gd \
+        && docker-php-source delete
+
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Copy the rest of the application code into the container
+COPY . /var/www/html
+RUN mv .env.sample .env
+
+# Expose port 8000 for the Laravel development server
+EXPOSE 8000
+
+# Define the command to start the Laravel development server
+ENTRYPOINT [ "sh", "serve.sh" ]
+```
+Content of `serve.sh
+```bash
+#!/bin/bash
+
+composer install  --no-interaction
+
+php artisan migrate
+php artisan key:generate
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+
+php artisan serve  --host=0.0.0.0
+```
+4. Run the Todo App
+![todo-build](images/todo-build.png)
+![todo](images/todo.png)
+Access the web on your browser
+![todo-homepage](images/todo-hp.png)
